@@ -1,6 +1,7 @@
 package com.hmdp.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.LoginFormDTO;
@@ -11,21 +12,29 @@ import com.hmdp.mapper.UserMapper;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.RegexUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
 
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import static com.hmdp.utils.RedisConstants.*;
 import static com.hmdp.utils.SystemConstants.USER_NICK_NAME_PREFIX;
 
 /**
  * <p>
- * 服务实现类
+ * Service impl
  * </p>
  *
  */
 @Slf4j
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
+  @Resource
+  private StringRedisTemplate stringRedisTemplate;
 
   @Override
   public Result sendCode(String phone, HttpSession session) {
@@ -35,7 +44,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     }
 
     String code = RandomUtil.randomNumbers(6);
-    session.setAttribute("code", code);
+    // store into redis phone->code
+    stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
     log.debug("Successfully send verification email! code: {}", code);
     return Result.ok();
   }
@@ -48,7 +58,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
       return Result.fail("Format of phone number is invalid!");
     }
     // server saved code
-    Object cacheCode = session.getAttribute("code");
+    String cacheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
     // front end got form code
     String code = loginForm.getCode();
     if (cacheCode == null || !cacheCode.equals(code)) {
@@ -62,7 +72,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
       user = createUserWithPhone(phone);
     }
 
-    session.setAttribute("user", BeanUtil.copyProperties(user, UserDTO.class));
+    // generate token for login
+    String token = UUID.randomUUID().toString(true);
+    // turn object to hash store
+    UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+    Map<String, Object> userMap = BeanUtil.beanToMap(userDTO);
+
+    String tokenKey = LOGIN_USER_KEY + token;
+    stringRedisTemplate.opsForHash().putAll(tokenKey, userMap);
+    stringRedisTemplate.expire(tokenKey, LOGIN_USER_TTL, TimeUnit.MINUTES);
     return Result.ok();
   }
 
