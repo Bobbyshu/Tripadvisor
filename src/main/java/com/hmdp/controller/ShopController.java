@@ -13,7 +13,7 @@ import javax.annotation.Resource;
 
 /**
  * <p>
- * 前端控制器
+ * front end shop controller
  * </p>
  *
  */
@@ -31,7 +31,7 @@ public class ShopController {
      */
     @GetMapping("/{id}")
     public Result queryShopById(@PathVariable("id") Long id) {
-        return Result.ok(shopService.getById(id));
+        return shopService.queryById(id);
     }
 
     /**
