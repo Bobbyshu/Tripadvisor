@@ -1,6 +1,6 @@
 package com.hmdp.utils;
 
-import com.hmdp.entity.User;
+import com.hmdp.dto.UserDTO;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import javax.servlet.http.HttpServletRequest;
@@ -18,7 +18,7 @@ public class LoginInterceptor implements HandlerInterceptor {
     }
 
     // store user info into threadlocal
-    UserHolder.saveUser((User) user);
+    UserHolder.saveUser((UserDTO) user);
     return true;
   }
 
