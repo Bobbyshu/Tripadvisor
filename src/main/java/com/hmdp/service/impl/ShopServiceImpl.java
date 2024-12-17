@@ -15,8 +15,7 @@ import javax.annotation.Resource;
 
 import java.util.concurrent.TimeUnit;
 
-import static com.hmdp.utils.RedisConstants.CACHE_SHOP_KEY;
-import static com.hmdp.utils.RedisConstants.CACHE_SHOP_TTL;
+import static com.hmdp.utils.RedisConstants.*;
 
 /**
  * <p>
@@ -40,9 +39,16 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
       return Result.ok(shop);
     }
 
+    // got null value
+    if (shopJson != null) {
+      return Result.fail("shop info non-exist");
+    }
+
     // request DB if cache non-exist
     Shop shop = getById(id);
     if (shop == null) {
+      // write null value into redis
+      stringRedisTemplate.opsForValue().set(key, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
       return Result.fail("Shop with current ID non-exist");
     }
 
