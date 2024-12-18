@@ -11,6 +11,8 @@ import javax.servlet.http.HttpServletResponse;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import static com.hmdp.utils.RedisConstants.LOGIN_USER_KEY;
+
 public class RefreshTokenInterceptor implements HandlerInterceptor {
   private StringRedisTemplate stringRedisTemplate;
 
@@ -22,12 +24,11 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
   public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
     String token = request.getHeader("authorization");
     if (StrUtil.isBlank(token)) {
-      response.setStatus(401);
-      return false;
+      return true;
     }
 
     // got user by token
-    String key = RedisConstants.LOGIN_USER_KEY + token;
+    String key = LOGIN_USER_KEY + token;
     Map<Object, Object> userMap = stringRedisTemplate.opsForHash().entries(key);
     if (userMap.isEmpty()) {
       return true;
