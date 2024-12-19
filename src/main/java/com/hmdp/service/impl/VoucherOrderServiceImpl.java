@@ -9,6 +9,7 @@ import com.hmdp.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.UserHolder;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,9 +18,8 @@ import java.time.LocalDateTime;
 
 /**
  * <p>
- *  服务实现类
+ * 服务实现类
  * </p>
- *
  */
 @Service
 @Transactional
@@ -47,9 +47,17 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     if (voucher.getStock() < 1) {
       return Result.fail("stock sold out!");
     }
-
-    // each user only order once
     Long userId = UserHolder.getUser().getId();
+    synchronized (userId.toString().intern()) {
+      IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+      return proxy.createVoucherOrder(voucherId);
+    }
+  }
+
+  @Transactional
+  public Result createVoucherOrder(Long voucherId) {
+    Long userId = UserHolder.getUser().getId();
+
     int count = query().eq("user_id", userId).eq("voucher_id", voucherId).count();
     if (count > 0) {
       return Result.fail("You have purchased before");
@@ -76,5 +84,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     save(voucherOrder);
 
     return Result.ok(orderId);
+
   }
 }
