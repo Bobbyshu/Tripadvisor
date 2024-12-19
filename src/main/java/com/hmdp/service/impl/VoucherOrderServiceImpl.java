@@ -48,6 +48,13 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
       return Result.fail("stock sold out!");
     }
 
+    // each user only order once
+    Long userId = UserHolder.getUser().getId();
+    int count = query().eq("user_id", userId).eq("voucher_id", voucherId).count();
+    if (count > 0) {
+      return Result.fail("You have purchased before");
+    }
+
     boolean success = seckillVoucherService.update()
         .setSql("stock = stock - 1")
         .eq("voucher_id", voucherId)
@@ -57,12 +64,12 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     if (!success) {
       return Result.fail("stock sold out!");
     }
+
     // order id
     VoucherOrder voucherOrder = new VoucherOrder();
     long orderId = redisIdWorker.nextId("order");
     voucherOrder.setId(orderId);
     // user id
-    Long userId = UserHolder.getUser().getId();
     voucherOrder.setUserId(userId);
     // voucher id
     voucherOrder.setVoucherId(voucherId);
