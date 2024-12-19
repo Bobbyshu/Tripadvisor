@@ -33,3 +33,4 @@ build/
 .vscode/
 # 忽略 application.yaml 文件
 /src/main/resources/application.yaml
+/src/main/java/com/hmdp/config/RedissonConfig.java
