@@ -29,6 +29,9 @@ The backend app includes several advanced Redis-based features such as:
 - **User Check-ins**: Redis Bitmap for check-in tracking.
 - **UV Statistics**: Redis HyperLogLog for unique visitor counting.
 
+## Framework Diagram
+![Framework](src/main/resources/Framework.png)
+
 ## Database Tables
 
 The project uses the following tables:
