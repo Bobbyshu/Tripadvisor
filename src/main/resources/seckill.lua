@@ -15,3 +15,5 @@ end
 
 redis.call('incrby', stockKey, -1)
 redis.call('sadd', orderKey, userId)
+
+return 0
