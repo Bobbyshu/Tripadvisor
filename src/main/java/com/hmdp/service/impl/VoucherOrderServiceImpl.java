@@ -1,15 +1,14 @@
 package com.hmdp.service.impl;
 
 import com.hmdp.dto.Result;
-import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.entity.VoucherOrder;
 import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.RedisIdWorker;
-import com.hmdp.utils.SimpleRedisLock;
 import com.hmdp.utils.UserHolder;
+import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
@@ -21,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
-import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -33,6 +31,7 @@ import java.util.concurrent.Executors;
  * 服务实现类
  * </p>
  */
+@Slf4j
 @Service
 @Transactional
 public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> implements IVoucherOrderService {
@@ -65,10 +64,36 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
   private class VoucherOrderHandle implements Runnable {
     @Override
     public void run() {
-
+      while (true) {
+        try {
+          VoucherOrder voucherOrder = orderTasks.take();
+          handleVoucherOrder(voucherOrder);
+        } catch (Exception e) {
+          log.error("Error happens: ", e);
+        }
+      }
     }
   }
 
+  private void handleVoucherOrder(VoucherOrder voucherOrder) {
+    Long userId = voucherOrder.getUserId();
+    RLock lock = redissonClient.getLock("lock:order" + userId);
+
+    boolean isLock = lock.tryLock();
+
+    if (!isLock) {
+      log.error("Can't place order twice!");
+      return;
+    }
+
+    try {
+      return proxy.createVoucherOrder(voucherOrder);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private IVoucherOrderService proxy;
   @Override
   public Result seckillVoucher(Long voucherId) {
     Long userId = UserHolder.getUser().getId();
@@ -90,6 +115,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     // add into blocking queue
     orderTasks.add(voucherOrder);
+    proxy = (IVoucherOrderService) AopContext.currentProxy();
+
     return Result.ok(orderId);
   }
 
@@ -129,35 +156,26 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 //  }
 
   @Transactional
-  public Result createVoucherOrder(Long voucherId) {
-    Long userId = UserHolder.getUser().getId();
+  public void createVoucherOrder(VoucherOrder voucherOrder) {
+    Long userId = voucherOrder.getUserId();
 
-    int count = query().eq("user_id", userId).eq("voucher_id", voucherId).count();
+    int count = query().eq("user_id", userId).eq("voucher_id", voucherOrder.getVoucherId()).count();
     if (count > 0) {
-      return Result.fail("You have purchased before");
+      log.error("Can't place order twice!");
+      return;
     }
 
     boolean success = seckillVoucherService.update()
         .setSql("stock = stock - 1")
-        .eq("voucher_id", voucherId)
+        .eq("voucher_id", voucherOrder.getVoucherId())
         .gt("stock", 0)
         .update();
 
     if (!success) {
-      return Result.fail("stock sold out!");
+      log.error("stock sold out!");
+      return;
     }
 
-    // order id
-    VoucherOrder voucherOrder = new VoucherOrder();
-    long orderId = redisIdWorker.nextId("order");
-    voucherOrder.setId(orderId);
-    // user id
-    voucherOrder.setUserId(userId);
-    // voucher id
-    voucherOrder.setVoucherId(voucherId);
     save(voucherOrder);
-
-    return Result.ok(orderId);
-
   }
 }
