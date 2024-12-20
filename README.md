@@ -29,7 +29,7 @@ The backend app includes several advanced Redis-based features such as:
 - **User Check-ins**: Redis Bitmap for check-in tracking.
 - **UV Statistics**: Redis HyperLogLog for unique visitor counting.
 
-## Framework Diagram
+## General Framework Diagram
 ![Framework](src/main/resources/Framework.png)
 
 ## Database Tables
@@ -52,3 +52,6 @@ The project uses the following tables:
 - **Redis**: Used for caching and optimizing performance.
 - **MySQL**: Relational database to store persistent data.
 - **Redisson**: Redis client for Java, used for distributed data structures and services.
+
+## Flash sale feature analysis
+![Flash](src/main/resources/Feature_analysis.png)
