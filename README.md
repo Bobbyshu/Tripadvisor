@@ -1,12 +1,12 @@
-# TripAdvisor Backend App
+# Tripadvisor Backend App
 
-This project is a backend application mimicking some functionalities of **TripAdvisor**. It is developed as part of my learning journey to better understand and implement **Redis** in a real-world application. The app handles key business logic and provides API endpoints for a variety of actions related to users, shops, vouchers, and more.
+This project is a backend application mimicking some functionalities of **Tripadvisor**. It is developed as part of my learning journey to better understand and implement **Redis** in a real-world application. The app handles key business logic and provides API endpoints for a variety of actions related to users, shops, vouchers, and more.
 
 ## Purpose
 
 The goal of this project is to:
 - Understand and implement Redis for caching and database optimization.
-- Simulate a backend system similar to **TripAdvisor**.
+- Simulate a backend system similar to **Tripadvisor**.
 - Learn how to design a backend system with real-world data models.
 
 ## General Framework Diagram
