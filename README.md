@@ -48,4 +48,4 @@ The project uses the following tables:
 - **Spring Boot**: Framework for creating the backend application.
 - **Redis**: Used for caching and optimizing performance.
 - **MySQL**: Relational database to store persistent data.
-- **JPA**: Java Persistence API for database interactions.
+- **Redisson**: Redis client for Java, used for distributed data structures and services.
