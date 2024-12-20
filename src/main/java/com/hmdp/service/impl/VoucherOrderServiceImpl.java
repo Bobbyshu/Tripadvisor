@@ -19,9 +19,14 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * <p>
@@ -51,6 +56,19 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     SECKILL_SCRIPT.setResultType(Long.class);
   }
 
+  private BlockingQueue<VoucherOrder> orderTasks = new ArrayBlockingQueue<>(1024 * 1024);
+  private static final ExecutorService SECKILL_ORDER_EXECUTOR = Executors.newSingleThreadExecutor();
+  @PostConstruct
+  private void init() {
+    SECKILL_ORDER_EXECUTOR.submit(new VoucherOrderHandle());
+  }
+  private class VoucherOrderHandle implements Runnable {
+    @Override
+    public void run() {
+
+    }
+  }
+
   @Override
   public Result seckillVoucher(Long voucherId) {
     Long userId = UserHolder.getUser().getId();
@@ -65,6 +83,13 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     }
 
     long orderId = redisIdWorker.nextId("order");
+    VoucherOrder voucherOrder = new VoucherOrder();
+    voucherOrder.setId(orderId);
+    voucherOrder.setUserId(userId);
+    voucherOrder.setVoucherId(voucherId);
+
+    // add into blocking queue
+    orderTasks.add(voucherOrder);
     return Result.ok(orderId);
   }
 
