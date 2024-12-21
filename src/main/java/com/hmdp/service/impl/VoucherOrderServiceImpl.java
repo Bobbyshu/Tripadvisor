@@ -1,5 +1,6 @@
 package com.hmdp.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.VoucherOrder;
 import com.hmdp.mapper.VoucherOrderMapper;
@@ -13,6 +14,7 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.connection.stream.*;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
@@ -20,7 +22,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
+import java.time.Duration;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -55,19 +60,36 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     SECKILL_SCRIPT.setResultType(Long.class);
   }
 
-  private BlockingQueue<VoucherOrder> orderTasks = new ArrayBlockingQueue<>(1024 * 1024);
+//  private BlockingQueue<VoucherOrder> orderTasks = new ArrayBlockingQueue<>(1024 * 1024);
   private static final ExecutorService SECKILL_ORDER_EXECUTOR = Executors.newSingleThreadExecutor();
   @PostConstruct
   private void init() {
     SECKILL_ORDER_EXECUTOR.submit(new VoucherOrderHandle());
   }
   private class VoucherOrderHandle implements Runnable {
+    String queueName = "streams.order";
     @Override
     public void run() {
       while (true) {
         try {
-          VoucherOrder voucherOrder = orderTasks.take();
+          // got info from message queue
+          List<MapRecord<String, Object, Object>> list = stringRedisTemplate.opsForStream().read(
+              Consumer.from("g1", "c1"),
+              StreamReadOptions.empty().count(1).block(Duration.ofSeconds(2)),
+              StreamOffset.create(queueName, ReadOffset.lastConsumed())
+          );
+
+          if (list == null || list.isEmpty()) {
+            continue;
+          }
+
+          // retrieve record out of queue
+          MapRecord<String, Object, Object> record = list.get(0);
+          Map<Object, Object> values = record.getValue();
+          VoucherOrder voucherOrder = BeanUtil.fillBeanWithMap(values, new VoucherOrder(), true);
           handleVoucherOrder(voucherOrder);
+
+          stringRedisTemplate.opsForStream().acknowledge(queueName, "g1", record.getId());
         } catch (Exception e) {
           log.error("Error happens: ", e);
         }
@@ -97,28 +119,48 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
   @Override
   public Result seckillVoucher(Long voucherId) {
     Long userId = UserHolder.getUser().getId();
+    long orderId = redisIdWorker.nextId("order");
+
     Long result = stringRedisTemplate.execute(
         SECKILL_SCRIPT,
         Collections.emptyList(),
-        voucherId.toString(), userId.toString()
+        voucherId.toString(),
+        userId.toString(),
+        String.valueOf(orderId)
     );
     int res = result.intValue();
     if (res != 0) {
       return Result.fail(res == 1 ? "no enough stock" : "can't order twice");
     }
-
-    long orderId = redisIdWorker.nextId("order");
-    VoucherOrder voucherOrder = new VoucherOrder();
-    voucherOrder.setId(orderId);
-    voucherOrder.setUserId(userId);
-    voucherOrder.setVoucherId(voucherId);
-
-    // add into blocking queue
-    orderTasks.add(voucherOrder);
     proxy = (IVoucherOrderService) AopContext.currentProxy();
 
     return Result.ok(orderId);
   }
+//  @Override
+//  public Result seckillVoucher(Long voucherId) {
+//    Long userId = UserHolder.getUser().getId();
+//    Long result = stringRedisTemplate.execute(
+//        SECKILL_SCRIPT,
+//        Collections.emptyList(),
+//        voucherId.toString(), userId.toString()
+//    );
+//    int res = result.intValue();
+//    if (res != 0) {
+//      return Result.fail(res == 1 ? "no enough stock" : "can't order twice");
+//    }
+//
+//    long orderId = redisIdWorker.nextId("order");
+//    VoucherOrder voucherOrder = new VoucherOrder();
+//    voucherOrder.setId(orderId);
+//    voucherOrder.setUserId(userId);
+//    voucherOrder.setVoucherId(voucherId);
+//
+//    // add into blocking queue
+//    orderTasks.add(voucherOrder);
+//    proxy = (IVoucherOrderService) AopContext.currentProxy();
+//
+//    return Result.ok(orderId);
+//  }
 
 //  @Override
 //  public Result seckillVoucher(Long voucherId) {
