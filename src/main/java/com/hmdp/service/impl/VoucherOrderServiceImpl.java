@@ -92,6 +92,39 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
           stringRedisTemplate.opsForStream().acknowledge(queueName, "g1", record.getId());
         } catch (Exception e) {
           log.error("Error happens: ", e);
+          handlePendingList();
+        }
+      }
+    }
+
+    private void handlePendingList() {
+      while (true) {
+        try {
+          // got info from message queue
+          List<MapRecord<String, Object, Object>> list = stringRedisTemplate.opsForStream().read(
+              Consumer.from("g1", "c1"),
+              StreamReadOptions.empty().count(1),
+              StreamOffset.create(queueName, ReadOffset.from("0"))
+          );
+
+          if (list == null || list.isEmpty()) {
+            break;
+          }
+
+          // retrieve record out of queue
+          MapRecord<String, Object, Object> record = list.get(0);
+          Map<Object, Object> values = record.getValue();
+          VoucherOrder voucherOrder = BeanUtil.fillBeanWithMap(values, new VoucherOrder(), true);
+          handleVoucherOrder(voucherOrder);
+
+          stringRedisTemplate.opsForStream().acknowledge(queueName, "g1", record.getId());
+        } catch (Exception e) {
+          log.error("Error happens: ", e);
+          try {
+            Thread.sleep(20);
+          } catch (InterruptedException ex) {
+            throw new RuntimeException(ex);
+          }
         }
       }
     }
