@@ -1,5 +1,6 @@
 package com.hmdp.service.impl;
 
+import cn.hutool.core.util.BooleanUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Blog;
@@ -9,10 +10,14 @@ import com.hmdp.service.IBlogService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.SystemConstants;
+import com.hmdp.utils.UserHolder;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.List;
+
+import static com.hmdp.utils.RedisConstants.BLOG_LIKED_KEY;
 
 /**
  * <p>
@@ -24,6 +29,9 @@ import java.util.List;
 public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IBlogService {
   @Resource
   private IUserService userService;
+
+  @Resource
+  private StringRedisTemplate stringRedisTemplate;
 
   @Override
   public Result queryHotBlog(Integer current) {
@@ -41,6 +49,27 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
       blog.setIcon(user.getIcon());
     });
     return Result.ok(records);
+  }
+
+  @Override
+  public Result likeBlog(Long id) {
+    Long userId = UserHolder.getUser().getId();
+    String key = BLOG_LIKED_KEY + id;
+    Boolean isMember = stringRedisTemplate.opsForSet().isMember(key, userId.toString());
+
+    if (BooleanUtil.isFalse(isMember)) {  // like
+      boolean isSuccess = update().setSql("liked = liked + 1").eq("id", id).update();
+      if (isSuccess) {
+        stringRedisTemplate.opsForSet().add(key, userId.toString());
+      }
+    } else {  // unlike
+      boolean isSuccess = update().setSql("liked = liked - 1").eq("id", id).update();
+      if (isSuccess) {
+        stringRedisTemplate.opsForSet().remove(key, userId.toString());
+      }
+    }
+
+    return Result.ok();
   }
 
   @Override
