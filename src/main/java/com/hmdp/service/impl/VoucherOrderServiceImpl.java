@@ -67,7 +67,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     SECKILL_ORDER_EXECUTOR.submit(new VoucherOrderHandle());
   }
   private class VoucherOrderHandle implements Runnable {
-    String queueName = "streams.order";
+    String queueName = "stream.orders";
     @Override
     public void run() {
       while (true) {
