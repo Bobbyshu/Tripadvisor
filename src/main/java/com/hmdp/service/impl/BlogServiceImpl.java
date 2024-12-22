@@ -2,6 +2,7 @@ package com.hmdp.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.BooleanUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
@@ -88,7 +89,10 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     }
 
     List<Long> ids = top5.stream().map(Long::valueOf).collect(Collectors.toList());
-    List<UserDTO> userDTOS = userService.listByIds(ids)
+    String idStr = StrUtil.join(",", ids);
+    List<UserDTO> userDTOS = userService.query()
+        .in("id", ids)
+        .last("ORDER BY FIELD(id," + idStr + ")").list()
         .stream()
         .map(user -> BeanUtil.copyProperties(user, UserDTO.class))
         .collect(Collectors.toList());
@@ -111,6 +115,11 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
   }
 
   private void isBlogLiked(Blog blog) {
+    UserDTO userDTO = UserHolder.getUser();
+    if (userDTO == null) {
+      return;
+    }
+
     Long userId = UserHolder.getUser().getId();
     String key = BLOG_LIKED_KEY + blog.getId();
     Double score = stringRedisTemplate.opsForZSet().score(key, userId.toString());
