@@ -7,10 +7,12 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
+import com.hmdp.entity.Follow;
 import com.hmdp.entity.User;
 import com.hmdp.mapper.BlogMapper;
 import com.hmdp.service.IBlogService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.service.IFollowService;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
@@ -35,9 +37,10 @@ import static com.hmdp.utils.RedisConstants.BLOG_LIKED_KEY;
 public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IBlogService {
   @Resource
   private IUserService userService;
-
   @Resource
   private StringRedisTemplate stringRedisTemplate;
+  @Resource
+  private IFollowService followService;
 
   @Override
   public Result queryHotBlog(Integer current) {
@@ -97,6 +100,24 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         .map(user -> BeanUtil.copyProperties(user, UserDTO.class))
         .collect(Collectors.toList());
     return Result.ok(userDTOS);
+  }
+
+  @Override
+  public Result saveBlog(Blog blog) {
+    UserDTO user = UserHolder.getUser();
+    blog.setUserId(user.getId());
+
+    boolean success = save(blog);
+    if (!success) {
+      return Result.fail("Save post unsuccessfully!");
+    }
+    List<Follow> follows = followService.query().eq("follow_user_id", user.getId()).list();
+    for (Follow follow : follows) {
+      Long userId = follow.getUserId();
+      String key = "feeds:" + userId;
+      stringRedisTemplate.opsForZSet().add(key, blog.getId().toString(), System.currentTimeMillis());
+    }
+    return Result.ok(blog.getId());
   }
 
   @Override
