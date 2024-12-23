@@ -17,20 +17,12 @@ The goal of this project is to:
 The backend app includes several advanced Redis-based features such as:
 
 - **SMS Login**: Redis shared session management.
-- **Merchant Query Cache**: Caching merchant data.
-- **Enterprise Cache Techniques**: Solutions for cache avalanche and penetration.
-- **Coupon Seckill**: High-concurrency coupon system.
-- **Redis Counters & Lua Scripts**: Atomic counters and Lua scripting.
-- **Distributed Locks**: Redis-based distributed locking.
-- **Redis Message Queues**: Three types of Redis message queues.
+- **Coupon Flash Sale**: High-concurrency coupon falsh sale practice.
 - **Nearby Merchants**: Redis GeoHash for location-based queries.
-- **Black Horse Review**: Review system with Redis.
-- **Influencer Shop Reviews**: User blogs for merchant reviews.
+- **Influencer Shop Reviews**: User posts for merchant reviews.
 - **Like Lists**: Redis List-based like tracking.
-- **Leaderboard**: Redis SortedSet for ranking.
 - **Friend Follow System**: Redis Set for follow/unfollow and notifications.
 - **User Check-ins**: Redis Bitmap for check-in tracking.
-- **UV Statistics**: Redis HyperLogLog for unique visitor counting.
 
 ## Database Tables
 
